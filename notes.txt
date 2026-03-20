@@ -1,0 +1,14 @@
+which players take which cards?
+
+N players
+D = Dealer
+
+D+1 : 1, N+1
+D+2 : 2, N+2
+D+3 : 3, N+3
+...
+D+N : N, 2N
+
+Burn : 2N+1, 2N+5, 2N+7
+
+Table : 2N+2, 2N+3, 2N+4, 2N+6, 2N+8

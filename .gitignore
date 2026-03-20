@@ -1,0 +1,9 @@
+build/
+rigged-poker-shuffler
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.exe
+
