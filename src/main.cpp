@@ -16,15 +16,24 @@
 static void printUsage(const char* argv0) {
   std::cerr
       << "Usage:\n"
-      << "  " << argv0 << " <winner_player> <num_players> [seed]\n\n"
+      << "  " << argv0 << " <winner_player> <num_players> [seed] [--verbose|--concise]\n\n"
       << "Notes:\n"
       << "  - Players are 1..N in dealing order as described in notes.txt.\n"
+      << "  - If `seed` is omitted, you can pass `--verbose`/`--concise` as the 3rd arg.\n"
       << "  - This searches for an interleaving of the two 26-card halves that makes the\n"
       << "    chosen player have the best Texas Hold'em hand (tie allowed).\n";
 }
 
+static bool isDigits(const std::string& s) {
+  if (s.empty()) return false;
+  for (char ch : s) {
+    if (ch < '0' || ch > '9') return false;
+  }
+  return true;
+}
+
 int main(int argc, char** argv) {
-  if (argc != 3 && argc != 4) {
+  if (argc < 3 || argc > 5) {
     printUsage(argv[0]);
     return 2;
   }
@@ -32,7 +41,25 @@ int main(int argc, char** argv) {
   int winnerPlayer = std::stoi(argv[1]);
   int N = std::stoi(argv[2]);
   std::optional<uint64_t> seed;
-  if (argc == 4) seed = (uint64_t)std::stoull(argv[3]);
+
+  // Default to concise output (minimal: community + player hole cards + hand + final_cost).
+  bool verbose = false;
+
+  if (argc >= 4) {
+    std::string a3 = argv[3];
+    if (isDigits(a3)) {
+      seed = (uint64_t)std::stoull(a3);
+    } else {
+      if (a3 == "--verbose" || a3 == "-v") verbose = true;
+      if (a3 == "--concise" || a3 == "-c") verbose = false;
+    }
+  }
+  if (argc == 5) {
+    std::string a4 = argv[4];
+    if (a4 == "--verbose" || a4 == "-v") verbose = true;
+    if (a4 == "--concise" || a4 == "-c") verbose = false;
+    // Otherwise ignore unknown extra args to keep CLI forgiving.
+  }
 
   if (N < 1 || N > 22) {
     std::cerr << "num_players must be in [1, 22] so that 2N+8 <= 52.\n";
@@ -156,14 +183,16 @@ int main(int argc, char** argv) {
   for (int p = 2; p <= N; p++) best = (best < playerValues[p] ? playerValues[p] : best);
   bool targetOk = !(playerValues[winnerPlayer] < best);
 
-  std::cout << "rigged-poker-shuffler\n";
-  std::cout << "seed=" << actualSeed << "\n";
-  std::cout << "winner_player=" << winnerPlayer << " num_players=" << N << "\n";
-  std::cout << "L(cards used for deal)=" << L << "\n";
-  std::cout << "minimize_cost=adjacent_same_picks\n";
-  std::cout << "final_cost=" << totalCost << "\n";
-  std::cout << "target_has_best_hand=" << (targetOk ? "true" : "false") << "\n\n";
-  std::cout << "search_time_ms=" << searchMs << "\n";
+  if (verbose) {
+    std::cout << "rigged-poker-shuffler\n";
+    std::cout << "seed=" << actualSeed << "\n";
+    std::cout << "winner_player=" << winnerPlayer << " num_players=" << N << "\n";
+    std::cout << "L(cards used for deal)=" << L << "\n";
+    std::cout << "minimize_cost=adjacent_same_picks\n";
+    std::cout << "final_cost=" << totalCost << "\n";
+    std::cout << "target_has_best_hand=" << (targetOk ? "true" : "false") << "\n";
+    std::cout << "search_time_ms=" << searchMs << "\n\n";
+  }
 
   std::cout << "Community: ";
   for (int i = 0; i < 5; i++) {
@@ -176,14 +205,49 @@ int main(int argc, char** argv) {
     const Card hole1 = output[p - 1];
     const Card hole2 = output[N + p - 1];
     const HandValue& hv = playerValues[p];
-    std::cout << "Player " << p << (p == winnerPlayer ? " (WINNER)" : "") << ": "
-              << cardToString(hole1) << ' ' << cardToString(hole2)
-              << "  hand=" << handCategoryName(hv) << "\n";
+    if (!verbose) {
+      std::cout << "Player " << p << (p == winnerPlayer ? " (WINNER)" : "") << ": "
+                << cardToString(hole1) << ' ' << cardToString(hole2)
+                << "  hand=" << handCategoryName(hv) << "\n";
+    } else {
+      std::cout << "Player " << p << (p == winnerPlayer ? " (WINNER)" : "") << ": "
+                << cardToString(hole1) << ' ' << cardToString(hole2)
+                << "  hand=" << handCategoryName(hv) << "\n";
+    }
   }
 
-  std::cout << "\nOutput deck order (52):\n";
-  for (int i = 0; i < 52; i++) {
-    std::cout << cardToString(output[i]) << (i + 1 == 52 ? '\n' : ' ');
+  if (verbose) {
+    std::cout << "\nHalf decks and pick sequence\n";
+
+    std::cout << "A half (top->bottom order as in the shuffled cut): ";
+    for (int i = 0; i < 26; i++) {
+      std::cout << cardToString(A[i]) << (i + 1 == 26 ? '\n' : ' ');
+    }
+    std::cout << "B half (top->bottom order as in the shuffled cut): ";
+    for (int i = 0; i < 26; i++) {
+      std::cout << cardToString(B[i]) << (i + 1 == 26 ? '\n' : ' ');
+    }
+
+    std::cout << "Pick order A_rev (next picked card is at index 0): ";
+    for (int i = 0; i < 26; i++) {
+      std::cout << cardToString(A_rev[i]) << (i + 1 == 26 ? '\n' : ' ');
+    }
+    std::cout << "Pick order B_rev (next picked card is at index 0): ";
+    for (int i = 0; i < 26; i++) {
+      std::cout << cardToString(B_rev[i]) << (i + 1 == 26 ? '\n' : ' ');
+    }
+
+    std::cout << "Sources (52 picks): ";
+    for (int i = 0; i < 52; i++) {
+      std::cout << (sources[i] == 0 ? 'A' : 'B') << (i + 1 == 52 ? '\n' : ' ');
+    }
+
+    std::cout << "Output deck order (52):\n";
+    for (int i = 0; i < 52; i++) {
+      std::cout << cardToString(output[i]) << (i + 1 == 52 ? '\n' : ' ');
+    }
+  } else {
+    std::cout << "\nfinal_cost=" << totalCost << "\n";
   }
 
   return 0;

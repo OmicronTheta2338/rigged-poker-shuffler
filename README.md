@@ -25,8 +25,10 @@ g++ -std=c++20 -O3 -Wall -Wextra -pedantic \
 ## Run
 
 ```bash
-./rigged-poker-shuffler <winner_player> <num_players> [seed]
+./rigged-poker-shuffler <winner_player> <num_players> [seed] [--verbose|--concise]
 ```
+
+If you omit `seed`, you may pass `--verbose`/`--concise` as the 3rd argument.
 
 Example:
 ```bash
